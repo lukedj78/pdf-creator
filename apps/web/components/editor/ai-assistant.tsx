@@ -22,6 +22,7 @@ import {
   Cancel01Icon,
   SentIcon,
   Delete02Icon,
+  MinusSignIcon,
 } from "@hugeicons/core-free-icons"
 import type { Template } from "@workspace/template-engine/schema"
 import { Suggestions, Suggestion } from "@/components/ai/suggestion"
@@ -125,7 +126,10 @@ export function AiAssistantPanel({
             <h3 className="text-sm font-semibold">AI Assistant</h3>
             <div className="flex items-center gap-2">
               <AiCreditsBadge />
-              <Button variant="ghost" size="icon-sm" onClick={onClose}>
+              <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Minimize">
+                <HugeiconsIcon icon={MinusSignIcon} size={16} />
+              </Button>
+              <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
                 <HugeiconsIcon icon={Cancel01Icon} size={16} />
               </Button>
             </div>
@@ -163,7 +167,10 @@ export function AiAssistantPanel({
               <h3 className="text-sm font-semibold">AI Assistant</h3>
               <div className="flex items-center gap-2">
                 <AiCreditsBadge />
-                <Button variant="ghost" size="icon-sm" onClick={onClose}>
+                <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Minimize">
+                  <HugeiconsIcon icon={MinusSignIcon} size={16} />
+                </Button>
+                <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
                   <HugeiconsIcon icon={Cancel01Icon} size={16} />
                 </Button>
               </div>
