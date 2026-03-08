@@ -1,0 +1,27 @@
+{
+  "name": "@workspace/template-engine",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./renderer": "./src/renderer/index.ts",
+    "./elements": "./src/elements/index.ts",
+    "./utils": "./src/utils/index.ts",
+    "./defaults": "./src/defaults/index.ts"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.10",
+    "@workspace/typescript-config": "workspace:*",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^5.9.3"
+  }
+}
