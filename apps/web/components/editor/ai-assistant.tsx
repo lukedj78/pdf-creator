@@ -23,6 +23,7 @@ import {
   SentIcon,
   Delete02Icon,
   MinusSignIcon,
+  ArrowUp01Icon,
 } from "@hugeicons/core-free-icons"
 import type { Template } from "@workspace/template-engine/schema"
 import { Suggestions, Suggestion } from "@/components/ai/suggestion"
@@ -182,7 +183,7 @@ export function AiAssistantPanel({
                   onClick={(e) => { e.stopPropagation(); setMinimized((v) => !v) }}
                   aria-label={minimized ? "Expand" : "Minimize"}
                 >
-                  <HugeiconsIcon icon={MinusSignIcon} size={16} />
+                  <HugeiconsIcon icon={minimized ? ArrowUp01Icon : MinusSignIcon} size={16} />
                 </Button>
                 <Button
                   variant="ghost"
