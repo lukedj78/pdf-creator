@@ -116,7 +116,7 @@ function CanvasElement({
         )
       case "Table": {
         const columns = (props.columns as Array<{ header: string; width?: string; align?: string; field?: string }>) || []
-        const staticRows = (props.rows as string[][]) || []
+        const staticRows = Array.isArray(props.rows) ? (props.rows as string[][]) : []
 
         // Build dynamic rows from repeat data source
         let dynamicRows: string[][] = []
