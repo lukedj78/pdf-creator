@@ -64,6 +64,11 @@ import {
   FilterIcon,
   CheckmarkCircle01Icon,
   Edit01Icon,
+  ArrowRight01Icon,
+  SparklesIcon,
+  InfinityCircleIcon,
+  UserGroup02Icon,
+  Link01Icon,
 } from "@hugeicons/core-free-icons"
 import { trpc } from "@/lib/trpc"
 import Link from "next/link"
@@ -87,6 +92,7 @@ export default function TemplatesPage() {
   const [statusFilter, setStatusFilter] = useQueryState("status", parseAsStringLiteral(["all", "draft", "published"] as const).withDefault("all").withOptions({ clearOnDefault: true, shallow: false }))
   const [page, setPage] = useQueryState("page", parseAsInteger.withDefault(1).withOptions({ clearOnDefault: true, shallow: false }))
   const [createOpen, setCreateOpen] = useState(false)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const [newName, setNewName] = useState("")
@@ -105,9 +111,24 @@ export default function TemplatesPage() {
     perPage: 20,
   })
 
+  const { data: billing } = trpc.billing.getUsage.useQuery()
+
+  const templateLimitReached = billing
+    ? billing.limits.templates !== null && billing.usage.templates >= billing.limits.templates
+    : false
+
+  function handleNewTemplate() {
+    if (templateLimitReached) {
+      setUpgradeOpen(true)
+    } else {
+      setCreateOpen(true)
+    }
+  }
+
   const createMutation = trpc.templates.create.useMutation({
     onSuccess: () => {
       utils.templates.list.invalidate()
+      utils.billing.getUsage.invalidate()
       setCreateOpen(false)
       setNewName("")
       setNewDescription("")
@@ -116,12 +137,16 @@ export default function TemplatesPage() {
   })
 
   const duplicateMutation = trpc.templates.duplicate.useMutation({
-    onSuccess: () => utils.templates.list.invalidate(),
+    onSuccess: () => {
+      utils.templates.list.invalidate()
+      utils.billing.getUsage.invalidate()
+    },
   })
 
   const deleteMutation = trpc.templates.delete.useMutation({
     onSuccess: () => {
       utils.templates.list.invalidate()
+      utils.billing.getUsage.invalidate()
       setDeleteId(null)
     },
   })
@@ -179,15 +204,11 @@ export default function TemplatesPage() {
                 Gallery
               </Button>
             </Link>
+            <Button onClick={handleNewTemplate}>
+              <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" />
+              New Template
+            </Button>
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger
-                render={
-                  <Button>
-                    <HugeiconsIcon icon={Add01Icon} data-icon="inline-start" />
-                    New Template
-                  </Button>
-                }
-              />
             <DialogContent>
             <DialogHeader>
               <DialogTitle>Create Template</DialogTitle>
@@ -251,6 +272,77 @@ export default function TemplatesPage() {
               </Button>
             </DialogFooter>
           </DialogContent>
+          </Dialog>
+
+          {/* Upgrade Dialog */}
+          <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
+            <DialogContent className="max-w-md gap-0 p-0 overflow-hidden">
+              {/* Header with visual accent */}
+              <div className="bg-muted/40 px-6 pt-8 pb-6 text-center space-y-3">
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <HugeiconsIcon icon={SparklesIcon} size={24} className="text-primary" />
+                </div>
+                <DialogHeader className="p-0">
+                  <DialogTitle className="text-lg">You've reached your limit</DialogTitle>
+                  <DialogDescription className="text-sm">
+                    Free plan includes up to {billing?.limits.templates ?? 3} templates. Upgrade to unlock unlimited templates and more.
+                  </DialogDescription>
+                </DialogHeader>
+              </div>
+
+              {/* Usage bar */}
+              <div className="px-6 py-4 border-b border-border">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                  <span>Templates used</span>
+                  <span className="font-medium text-destructive">
+                    {billing?.usage.templates ?? 0}/{billing?.limits.templates ?? 3}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-destructive transition-all" style={{ width: "100%" }} />
+                </div>
+              </div>
+
+              {/* Pro features */}
+              <div className="px-6 py-5 space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">What you get with Pro</p>
+                <div className="grid gap-2.5">
+                  {[
+                    { icon: InfinityCircleIcon, text: "Unlimited templates" },
+                    { icon: SparklesIcon, text: "500 AI credits/month" },
+                    { icon: Link01Icon, text: "Webhooks & MCP access" },
+                    { icon: UserGroup02Icon, text: "Up to 5 team members" },
+                  ].map((feature) => (
+                    <div key={feature.text} className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <HugeiconsIcon icon={feature.icon} size={14} className="text-primary" />
+                      </div>
+                      <span className="text-sm">{feature.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="px-6 pb-6 pt-2 flex flex-col gap-2">
+                <Button
+                  nativeButton={false}
+                  render={<Link href="/dashboard/settings?tab=billing" />}
+                  onClick={() => setUpgradeOpen(false)}
+                  className="w-full h-10 gap-2"
+                >
+                  Upgrade to Pro — $29/mo
+                  <HugeiconsIcon icon={ArrowRight01Icon} size={16} />
+                </Button>
+                <DialogClose
+                  render={
+                    <Button variant="ghost" className="w-full text-muted-foreground text-sm">
+                      Maybe later
+                    </Button>
+                  }
+                />
+              </div>
+            </DialogContent>
           </Dialog>
           </>
         }
@@ -516,9 +608,9 @@ function TemplateCard({
   onToggleStatus: () => void
 }) {
   return (
-    <motion.div variants={staggerItem} whileHover={hover.lift} whileTap={tap.press}>
-      <Card size="sm" className="group relative">
-        <CardHeader>
+    <motion.div variants={staggerItem} whileHover={hover.lift} whileTap={tap.press} className="h-full">
+      <Card size="sm" className="group relative h-full">
+        <CardHeader className="flex-1">
           <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-1">
             <HugeiconsIcon icon={File01Icon} size={20} className="text-muted-foreground" />
           </div>

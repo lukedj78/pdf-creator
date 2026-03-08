@@ -1,8 +1,10 @@
 import { z } from "zod"
+import { TRPCError } from "@trpc/server"
 import { eq, and, desc, ilike, or, count, asc, gte, lte } from "drizzle-orm"
 import { templates } from "@workspace/db/schema"
 import { router, orgProcedureWith, publicProcedure } from "../trpc"
 import { dispatchWebhookEvent } from "../lib/webhook-dispatcher"
+import { getOrgPlan, PLAN_LIMITS } from "../lib/quota"
 
 export const templatesRouter = router({
   list: orgProcedureWith({ template: ["read"] })
@@ -113,6 +115,22 @@ export const templatesRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Enforce template limit based on plan
+      const plan = await getOrgPlan(ctx.db, ctx.organizationId)
+      const limit = PLAN_LIMITS[plan].templates
+      if (limit !== Infinity) {
+        const [{ total }] = await ctx.db
+          .select({ total: count() })
+          .from(templates)
+          .where(eq(templates.organizationId, ctx.organizationId))
+        if (total >= limit) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `Template limit reached (${limit}). Upgrade your plan to create more templates.`,
+          })
+        }
+      }
+
       const [template] = await ctx.db
         .insert(templates)
         .values({
@@ -230,7 +248,7 @@ export const templatesRouter = router({
       return {
         id: t.id,
         name: t.name,
-        description: `${t.name} template preset`,
+        description: t.meta?.description ?? `${t.name} template preset`,
         pageSize: (pageProps.size as string) ?? "A4",
         orientation: (pageProps.orientation as string) ?? "portrait",
         elementCount: Object.keys(t.elements).length,
