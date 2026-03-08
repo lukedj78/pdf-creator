@@ -119,11 +119,11 @@ export const templatesRouter = router({
       const plan = await getOrgPlan(ctx.db, ctx.organizationId)
       const limit = PLAN_LIMITS[plan].templates
       if (limit !== Infinity) {
-        const [{ total }] = await ctx.db
+        const [countResult] = await ctx.db
           .select({ total: count() })
           .from(templates)
           .where(eq(templates.organizationId, ctx.organizationId))
-        if (total >= limit) {
+        if ((countResult?.total ?? 0) >= limit) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: `Template limit reached (${limit}). Upgrade your plan to create more templates.`,
