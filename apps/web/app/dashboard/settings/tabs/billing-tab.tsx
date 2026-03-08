@@ -207,7 +207,6 @@ export function BillingTab() {
                 total={limits?.members ?? null}
               />
             </div>
-          </div>
         </div>
       </div>
 
