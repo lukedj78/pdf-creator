@@ -103,10 +103,16 @@ export function AiAssistantPanel({
   const isMobile = useIsMobile()
   const { state, dispatch } = useEditor()
   const [mounted, setMounted] = useState(false)
+  const [minimized, setMinimized] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Reset minimized when panel reopens
+  useEffect(() => {
+    if (isOpen) setMinimized(false)
+  }, [isOpen])
 
   const chatContent = (
     <AiAssistantChat
@@ -126,9 +132,6 @@ export function AiAssistantPanel({
             <h3 className="text-sm font-semibold">AI Assistant</h3>
             <div className="flex items-center gap-2">
               <AiCreditsBadge />
-              <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Minimize">
-                <HugeiconsIcon icon={MinusSignIcon} size={16} />
-              </Button>
               <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
                 <HugeiconsIcon icon={Cancel01Icon} size={16} />
               </Button>
@@ -158,24 +161,42 @@ export function AiAssistantPanel({
             role="dialog"
             aria-label="AI Assistant"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            animate={minimized
+              ? { opacity: 1, y: 0, scale: 1, height: "auto" }
+              : { opacity: 1, y: 0, scale: 1, height: 600 }
+            }
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="flex h-[600px] w-[400px] flex-col overflow-hidden rounded-xl bg-background shadow-lg ring-1 ring-foreground/10"
+            className="flex w-[400px] flex-col overflow-hidden rounded-xl bg-background shadow-lg ring-1 ring-foreground/10"
           >
-            <div className="flex items-center justify-between border-b px-4 py-3">
+            <div
+              className={`flex items-center justify-between px-4 py-3 ${minimized ? "cursor-pointer" : "border-b"}`}
+              onClick={minimized ? () => setMinimized(false) : undefined}
+            >
               <h3 className="text-sm font-semibold">AI Assistant</h3>
-              <div className="flex items-center gap-2">
-                <AiCreditsBadge />
-                <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Minimize">
+              <div className="flex items-center gap-1">
+                {!minimized && <AiCreditsBadge />}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={(e) => { e.stopPropagation(); setMinimized((v) => !v) }}
+                  aria-label={minimized ? "Expand" : "Minimize"}
+                >
                   <HugeiconsIcon icon={MinusSignIcon} size={16} />
                 </Button>
-                <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={(e) => { e.stopPropagation(); onClose() }}
+                  aria-label="Close"
+                >
                   <HugeiconsIcon icon={Cancel01Icon} size={16} />
                 </Button>
               </div>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col">{chatContent}</div>
+            {!minimized && (
+              <div className="flex min-h-0 flex-1 flex-col">{chatContent}</div>
+            )}
           </motion.div>
         </div>
       )}
