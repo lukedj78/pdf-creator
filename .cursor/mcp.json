@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "pdfcreator": {
+      "command": "node",
+      "args": ["--import", "tsx", "packages/mcp/src/stdio.ts"],
+      "cwd": "/Users/lucadigerlando/Repositories/luke/pdf-generator",
+      "env": {
+        "PDFCREATOR_API_KEY": "JFLnyvWIdZWpNirCMCLGaHXWvcERysCvuyZJWrRORsgxxCzyXrnIyLeHkwDzXZiJ",
+        "PDFCREATOR_URL": "http://localhost:3002/api/v1"
+      }
+    }
+  }
+}
