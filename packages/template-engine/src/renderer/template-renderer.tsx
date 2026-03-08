@@ -55,7 +55,24 @@ function RenderElement({ elementId, element, template, ctx, scale }: RenderEleme
     })
   }
 
-  // Handle repeat
+  // Handle Table with repeat: generate rows from data source instead of duplicating the whole table
+  if (element.repeat && element.type === "Table") {
+    const array = resolvePointer(ctx.state, element.repeat.statePath)
+    if (!Array.isArray(array)) {
+      return <TableElement props={resolvedProps as any} />
+    }
+    const columns = (resolvedProps.columns ?? []) as Array<{ header: string; width?: string; align?: string; field?: string }>
+    const dynamicRows = array.map((item) => {
+      const itemObj = typeof item === "object" && item !== null ? item as Record<string, unknown> : {}
+      return columns.map((col) => col.field ? String(itemObj[col.field] ?? "") : "")
+    })
+    // Merge: static rows first, then dynamic rows
+    const staticRows = (resolvedProps.rows ?? []) as string[][]
+    const mergedProps = { ...resolvedProps, rows: [...staticRows, ...dynamicRows] }
+    return <TableElement props={mergedProps as any} />
+  }
+
+  // Handle repeat (generic — duplicates element per item)
   if (element.repeat) {
     const array = resolvePointer(ctx.state, element.repeat.statePath)
     if (!Array.isArray(array)) return null

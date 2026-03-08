@@ -29,6 +29,7 @@ type EditorAction =
   | { type: "ADD_ELEMENT"; elementType: ElementType; parentId?: string; index?: number; props?: Record<string, unknown> }
   | { type: "REMOVE_ELEMENT"; elementId: string }
   | { type: "UPDATE_ELEMENT"; elementId: string; props?: Record<string, unknown> }
+  | { type: "SET_REPEAT"; elementId: string; repeat: { statePath: string; key: string } | undefined }
   | { type: "MOVE_ELEMENT"; elementId: string; newParentId: string; index: number }
   | { type: "DUPLICATE_ELEMENT"; elementId: string }
   | { type: "SELECT_ELEMENT"; elementId: string | null }
@@ -226,6 +227,19 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       const template = updateElement(state.template, action.elementId, {
         props: action.props,
       })
+      return pushHistory(state, template)
+    }
+
+    case "SET_REPEAT": {
+      // updateElement treats undefined as "keep current", so we need to
+      // directly set the element's repeat field for removal to work.
+      const el = state.template.elements[action.elementId]
+      if (!el) return state
+      const updated: Element = { ...el, repeat: action.repeat }
+      const template: Template = {
+        ...state.template,
+        elements: { ...state.template.elements, [action.elementId]: updated },
+      }
       return pushHistory(state, template)
     }
 

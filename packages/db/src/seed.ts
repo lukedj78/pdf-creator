@@ -33,6 +33,35 @@ const demoSchemas = [
     },
   },
   {
+    name: "Invoice (Dynamic Lines)",
+    description: "Invoice with dynamic repeating line items — ideal for variable-length invoices",
+    schema: {
+      root: "doc",
+      elements: {
+        doc: { type: "Document", props: { title: "Invoice" }, children: ["page"] },
+        page: { type: "Page", props: { size: "A4", orientation: "portrait", marginTop: 40, marginRight: 40, marginBottom: 40, marginLeft: 40 }, children: ["header", "table-header", "line-item", "total"] },
+        header: { type: "Heading", props: { text: { $template: "Invoice ${/invoice/number}" }, level: "h1" }, children: [] },
+        "table-header": { type: "Row", props: { gap: 0, padding: 8 }, children: ["th-desc", "th-qty", "th-amount"] },
+        "th-desc": { type: "Text", props: { text: "Description", fontSize: 10, fontWeight: "bold", color: "#666" }, children: [] },
+        "th-qty": { type: "Text", props: { text: "Qty", fontSize: 10, fontWeight: "bold", color: "#666", align: "center" }, children: [] },
+        "th-amount": { type: "Text", props: { text: "Amount", fontSize: 10, fontWeight: "bold", color: "#666", align: "right" }, children: [] },
+        "line-item": { type: "Row", props: { gap: 0, padding: 8 }, children: ["li-desc", "li-qty", "li-amount"], repeat: { statePath: "/lines", key: "id" } },
+        "li-desc": { type: "Text", props: { text: { $item: "description" }, fontSize: 11 }, children: [] },
+        "li-qty": { type: "Text", props: { text: { $item: "qty" }, fontSize: 11, align: "center" }, children: [] },
+        "li-amount": { type: "Text", props: { text: { $item: "amount" }, fontSize: 11, align: "right" }, children: [] },
+        total: { type: "Text", props: { text: { $state: "/total" }, fontWeight: "bold", align: "right", fontSize: 14 }, children: [] },
+      },
+      state: {
+        invoice: { number: "FT-001" },
+        lines: [
+          { id: "1", description: "Web Design", qty: "1", amount: "$800" },
+          { id: "2", description: "Development", qty: "2", amount: "$300" },
+        ],
+        total: "$1,100.00",
+      },
+    },
+  },
+  {
     name: "Contract Agreement",
     description: "Legal contract template with signature blocks",
     schema: {

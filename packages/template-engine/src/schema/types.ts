@@ -182,6 +182,7 @@ export const tableColumnSchema = z.object({
   header: z.string(),
   width: z.string().optional(),
   align: z.enum(["left", "center", "right"]).optional(),
+  field: z.string().optional(), // maps to $item[field] when Table has repeat
 })
 
 export const tablePropsSchema = z.object({

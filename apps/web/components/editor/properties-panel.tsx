@@ -21,6 +21,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@workspace/ui/components/dialog"
+import { Switch } from "@workspace/ui/components/switch"
+import { Separator } from "@workspace/ui/components/separator"
 import type { Element } from "@workspace/template-engine/schema"
 
 function PropField({
@@ -431,10 +433,11 @@ function LinkPropsEditor({ element, onUpdate }: { element: Element; onUpdate: (p
 
 function TablePropsEditor({ element, onUpdate }: { element: Element; onUpdate: (props: Record<string, unknown>) => void }) {
   const props = element.props as Record<string, unknown>
-  const columns = (props.columns as Array<{ header: string; width?: string; align?: string }>) || []
+  const columns = (props.columns as Array<{ header: string; width?: string; align?: string; field?: string }>) || []
   const rows = (props.rows as string[][]) || []
+  const hasRepeat = !!element.repeat
 
-  function updateColumn(i: number, updates: Partial<{ header: string; width: string; align: string }>) {
+  function updateColumn(i: number, updates: Partial<{ header: string; width: string; align: string; field: string }>) {
     const newCols = [...columns]
     newCols[i] = { ...newCols[i]!, ...updates }
     onUpdate({ columns: newCols })
@@ -442,7 +445,6 @@ function TablePropsEditor({ element, onUpdate }: { element: Element; onUpdate: (
 
   function addColumn() {
     const newCols = [...columns, { header: `Column ${columns.length + 1}` }]
-    // Also add empty cell to each row
     const newRows = rows.map((row) => [...row, ""])
     onUpdate({ columns: newCols, rows: newRows })
   }
@@ -472,24 +474,37 @@ function TablePropsEditor({ element, onUpdate }: { element: Element; onUpdate: (
   return (
     <>
       <PropField label="Columns">
-        <div className="space-y-1">
+        <div className="space-y-2">
           {columns.map((col, i) => (
-            <div key={i} className="flex gap-1 items-start">
-              <div className="flex-1">
-                <BindableField
-                  propValue={col.header}
-                  onChangeProp={(v) => updateColumn(i, { header: typeof v === "string" ? v : "" })}
-                  placeholder="Header"
-                />
+            <div key={i} className="space-y-1 border border-border rounded-md p-2">
+              <div className="flex gap-1 items-start">
+                <div className="flex-1">
+                  <BindableField
+                    propValue={col.header}
+                    onChangeProp={(v) => updateColumn(i, { header: typeof v === "string" ? v : "" })}
+                    placeholder="Header"
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => removeColumn(i)}
+                  className="mt-1"
+                >
+                  <HugeiconsIcon icon={Delete02Icon} size={12} />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => removeColumn(i)}
-                className="mt-1"
-              >
-                <HugeiconsIcon icon={Delete02Icon} size={12} />
-              </Button>
+              {hasRepeat && (
+                <div className="flex items-center gap-1">
+                  <Label className="text-[10px] text-muted-foreground shrink-0">Field:</Label>
+                  <Input
+                    value={col.field || ""}
+                    onChange={(e) => updateColumn(i, { field: e.target.value || undefined })}
+                    placeholder="item field name"
+                    className="h-6 text-xs font-mono flex-1"
+                  />
+                </div>
+              )}
             </div>
           ))}
           <Button variant="outline" size="xs" className="w-full" onClick={addColumn}>
@@ -497,33 +512,36 @@ function TablePropsEditor({ element, onUpdate }: { element: Element; onUpdate: (
           </Button>
         </div>
       </PropField>
-      <PropField label="Rows">
-        <div className="space-y-2">
-          {rows.map((row, ri) => (
-            <div key={ri} className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground">Row {ri + 1}</span>
-                <Button variant="ghost" size="icon-xs" onClick={() => removeRow(ri)}>
-                  <HugeiconsIcon icon={Delete02Icon} size={12} />
-                </Button>
+      {/* Static rows — only shown when no repeat, or as "extra" fixed rows */}
+      {!hasRepeat && (
+        <PropField label="Rows">
+          <div className="space-y-2">
+            {rows.map((row, ri) => (
+              <div key={ri} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">Row {ri + 1}</span>
+                  <Button variant="ghost" size="icon-xs" onClick={() => removeRow(ri)}>
+                    <HugeiconsIcon icon={Delete02Icon} size={12} />
+                  </Button>
+                </div>
+                <div className="space-y-1">
+                  {row.map((cell, ci) => (
+                    <BindableField
+                      key={ci}
+                      propValue={cell}
+                      onChangeProp={(v) => updateCell(ri, ci, typeof v === "string" ? v : "")}
+                      placeholder={columns[ci]?.header || ""}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="space-y-1">
-                {row.map((cell, ci) => (
-                  <BindableField
-                    key={ci}
-                    propValue={cell}
-                    onChangeProp={(v) => updateCell(ri, ci, typeof v === "string" ? v : "")}
-                    placeholder={columns[ci]?.header || ""}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-          <Button variant="outline" size="xs" className="w-full" onClick={addRow}>
-            Add Row
-          </Button>
-        </div>
-      </PropField>
+            ))}
+            <Button variant="outline" size="xs" className="w-full" onClick={addRow}>
+              Add Row
+            </Button>
+          </div>
+        </PropField>
+      )}
       <PropField label="Font Size">
         <Input
           type="number"
@@ -932,6 +950,206 @@ function DocumentPropsEditor({ onUpdate }: { onUpdate: (props: Record<string, un
 }
 
 // ---------------------------------------------------------------------------
+// Repeat Section
+// ---------------------------------------------------------------------------
+
+/** Find all state paths that point to arrays */
+function getArrayPaths(state: Record<string, unknown>, prefix = ""): string[] {
+  const paths: string[] = []
+  for (const [key, value] of Object.entries(state)) {
+    const path = `${prefix}/${key}`
+    if (Array.isArray(value)) {
+      paths.push(path)
+    } else if (value && typeof value === "object") {
+      paths.push(...getArrayPaths(value as Record<string, unknown>, path))
+    }
+  }
+  return paths
+}
+
+/** Get field names from the first item of an array in state */
+function getItemFields(state: Record<string, unknown>, statePath: string): string[] {
+  const parts = statePath.split("/").filter(Boolean)
+  let current: unknown = state
+  for (const part of parts) {
+    if (current && typeof current === "object" && !Array.isArray(current)) {
+      current = (current as Record<string, unknown>)[part]
+    } else {
+      return []
+    }
+  }
+  if (!Array.isArray(current) || current.length === 0) return []
+  const first = current[0]
+  if (first && typeof first === "object" && !Array.isArray(first)) {
+    return Object.keys(first as Record<string, unknown>)
+  }
+  return []
+}
+
+function RepeatSection({ elementId, element }: { elementId: string; element: Element }) {
+  const { state, dispatch } = useEditor()
+  const repeat = element.repeat
+  const isEnabled = !!repeat
+  const arrayPaths = getArrayPaths(state.template.state)
+
+  function handleToggle(enabled: boolean) {
+    if (enabled) {
+      const defaultPath = arrayPaths[0] || "/items"
+      const fields = getItemFields(state.template.state, defaultPath)
+      dispatch({
+        type: "SET_REPEAT",
+        elementId,
+        repeat: { statePath: defaultPath, key: fields[0] || "id" },
+      })
+    } else {
+      dispatch({ type: "SET_REPEAT", elementId, repeat: undefined })
+    }
+  }
+
+  const currentFields = repeat ? getItemFields(state.template.state, repeat.statePath) : []
+
+  // Count items in the array for preview info
+  const itemCount = repeat
+    ? (() => {
+        const parts = repeat.statePath.split("/").filter(Boolean)
+        let current: unknown = state.template.state
+        for (const part of parts) {
+          if (current && typeof current === "object" && !Array.isArray(current)) {
+            current = (current as Record<string, unknown>)[part]
+          } else return 0
+        }
+        return Array.isArray(current) ? current.length : 0
+      })()
+    : 0
+
+  return (
+    <div className="space-y-3">
+      <Separator />
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Repeat
+        </h4>
+        <Switch
+          checked={isEnabled}
+          onCheckedChange={handleToggle}
+        />
+      </div>
+
+      {isEnabled && repeat && (
+        <>
+          <PropField label="Data Source">
+            {arrayPaths.length > 0 ? (
+              <Select
+                value={repeat.statePath}
+                onValueChange={(v) => {
+                  if (!v) return
+                  dispatch({
+                    type: "SET_REPEAT",
+                    elementId,
+                    repeat: { ...repeat, statePath: v },
+                  })
+                }}
+              >
+                <SelectTrigger className="w-full font-mono text-xs">
+                  <SelectValue>
+                    {(value: string) => value}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {arrayPaths.map((path) => (
+                    <SelectItem key={path} value={path}>
+                      <span className="font-mono text-xs">{path}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={repeat.statePath}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_REPEAT",
+                    elementId,
+                    repeat: { ...repeat, statePath: e.target.value },
+                  })
+                }
+                placeholder="/items"
+                className="font-mono text-xs"
+              />
+            )}
+          </PropField>
+
+          <PropField label="Key Field">
+            {currentFields.length > 0 ? (
+              <Select
+                value={repeat.key}
+                onValueChange={(v) => {
+                  if (!v) return
+                  dispatch({
+                    type: "SET_REPEAT",
+                    elementId,
+                    repeat: { ...repeat, key: v },
+                  })
+                }}
+              >
+                <SelectTrigger className="w-full font-mono text-xs">
+                  <SelectValue>
+                    {(value: string) => value}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {currentFields.map((field) => (
+                    <SelectItem key={field} value={field}>
+                      <span className="font-mono text-xs">{field}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={repeat.key}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_REPEAT",
+                    elementId,
+                    repeat: { ...repeat, key: e.target.value },
+                  })
+                }
+                placeholder="id"
+                className="font-mono text-xs"
+              />
+            )}
+          </PropField>
+
+          {itemCount > 0 && (
+            <p className="text-[10px] text-muted-foreground">
+              {itemCount} item{itemCount !== 1 ? "s" : ""} in data source
+            </p>
+          )}
+
+          {currentFields.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-[10px] text-muted-foreground">Available fields</Label>
+              <div className="flex flex-wrap gap-1">
+                {currentFields.map((field) => (
+                  <span
+                    key={field}
+                    className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+                    title={`Use as: { "$item": "${field}" }`}
+                  >
+                    $item.{field}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main Panel
 // ---------------------------------------------------------------------------
 
@@ -1031,6 +1249,10 @@ export function PropertiesPanel({ mobile }: { mobile?: boolean } = {}) {
             <div className="space-y-3">
               {renderPropsEditor()}
             </div>
+            {/* Repeat config — only for content/layout elements, not Document/Page */}
+            {!isDocument && !isPage && selectedId && selectedElement && (
+              <RepeatSection elementId={selectedId} element={selectedElement} />
+            )}
           </>
         )}
 

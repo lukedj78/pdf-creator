@@ -5,7 +5,7 @@ import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities"
 import { useEditor } from "@/lib/editor/editor-context"
 import type { Template, Element, PageProps } from "@workspace/template-engine/schema"
-import { getPageElementId, getPageDimensions, resolveExpression, type ResolveContext } from "@workspace/template-engine/utils"
+import { getPageElementId, getPageDimensions, resolveExpression, resolvePointer, resolveProps, type ResolveContext } from "@workspace/template-engine/utils"
 
 function CanvasElement({
   elementId,
@@ -115,8 +115,23 @@ function CanvasElement({
           </span>
         )
       case "Table": {
-        const columns = (props.columns as Array<{ header: string; width?: string; align?: string }>) || []
-        const rows = (props.rows as string[][]) || []
+        const columns = (props.columns as Array<{ header: string; width?: string; align?: string; field?: string }>) || []
+        const staticRows = (props.rows as string[][]) || []
+
+        // Build dynamic rows from repeat data source
+        let dynamicRows: string[][] = []
+        if (element.repeat) {
+          const array = resolvePointer(template.state, element.repeat.statePath)
+          if (Array.isArray(array)) {
+            dynamicRows = array.map((item) => {
+              const itemObj = typeof item === "object" && item !== null ? item as Record<string, unknown> : {}
+              return columns.map((col) => col.field ? String(itemObj[col.field] ?? "") : "")
+            })
+          }
+        }
+
+        const allRows = [...staticRows, ...dynamicRows]
+
         return (
           <table style={{
             width: "100%",
@@ -143,19 +158,32 @@ function CanvasElement({
               </thead>
             )}
             <tbody>
-              {rows.map((row, i) => (
-                <tr key={i} style={props.striped && i % 2 === 1 ? { backgroundColor: "#f9fafb" } : undefined}>
-                  {(row || []).map((cell, j) => (
-                    <td key={j} style={{
-                      border: `1px solid ${props.borderColor || "#ddd"}`,
-                      padding: "4px 6px",
-                      textAlign: columns[j]?.align as React.CSSProperties["textAlign"] || "left",
-                    }}>
-                      {cell}
-                    </td>
-                  ))}
+              {allRows.length === 0 && element.repeat && (
+                <tr>
+                  <td colSpan={columns.length} style={{ padding: "8px", textAlign: "center", color: "#999", fontStyle: "italic", border: `1px solid ${props.borderColor || "#ddd"}` }}>
+                    No data in {element.repeat.statePath}
+                  </td>
                 </tr>
-              ))}
+              )}
+              {allRows.map((row, i) => {
+                const isDynamic = i >= staticRows.length
+                return (
+                  <tr key={i} style={{
+                    backgroundColor: props.striped && i % 2 === 1 ? "#f9fafb" : undefined,
+                    opacity: isDynamic && element.repeat ? 0.85 : undefined,
+                  }}>
+                    {(row || []).map((cell, j) => (
+                      <td key={j} style={{
+                        border: `1px solid ${props.borderColor || "#ddd"}`,
+                        padding: "4px 6px",
+                        textAlign: columns[j]?.align as React.CSSProperties["textAlign"] || "left",
+                      }}>
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )
@@ -300,19 +328,129 @@ function CanvasElement({
       }}
     >
       {(isSelected || isHovered) && (
-        <div
-          className="absolute -top-5 left-0 px-1.5 py-0.5 text-[10px] font-semibold rounded z-10"
-          style={{
-            backgroundColor: isSelected ? "#2563eb" : "#93b4f8",
-            color: "#ffffff",
-          }}
-        >
-          {element.type}
+        <div className="absolute -top-5 left-0 flex items-center gap-1 z-10">
+          <div
+            className="px-1.5 py-0.5 text-[10px] font-semibold rounded"
+            style={{
+              backgroundColor: isSelected ? "#2563eb" : "#93b4f8",
+              color: "#ffffff",
+            }}
+          >
+            {element.type}
+          </div>
+          {element.repeat && (
+            <div
+              className="px-1.5 py-0.5 text-[10px] font-semibold rounded"
+              style={{ backgroundColor: "#7c3aed", color: "#ffffff" }}
+            >
+              ↻ repeat
+            </div>
+          )}
         </div>
       )}
       {renderContent()}
+      {/* Ghost preview rows for repeat elements */}
+      {element.repeat && (isSelected || isHovered) && (
+        <RepeatGhostRows element={element} template={template} />
+      )}
     </div>
   )
+}
+
+/** Render 1-2 ghost rows showing how a repeat element looks with real data */
+function RepeatGhostRows({
+  element,
+  template,
+}: {
+  element: Element
+  template: Template
+}) {
+  if (!element.repeat) return null
+
+  const array = resolvePointer(template.state, element.repeat.statePath)
+  if (!Array.isArray(array) || array.length === 0) {
+    return (
+      <div className="border border-dashed border-purple-400/40 rounded px-2 py-1 mt-1">
+        <p className="text-[10px] text-purple-400/60 italic">
+          No data in {element.repeat.statePath}
+        </p>
+      </div>
+    )
+  }
+
+  // Show up to 2 ghost rows from the data
+  const ghostItems = array.slice(0, 2)
+
+  return (
+    <div className="mt-1 space-y-0.5">
+      {ghostItems.map((item, index) => {
+        const itemCtx: ResolveContext = {
+          state: template.state,
+          item: typeof item === "object" && item !== null ? item as Record<string, unknown> : {},
+          index,
+        }
+        const resolved = resolveProps(element.props as Record<string, unknown>, itemCtx)
+
+        return (
+          <div
+            key={index}
+            className="opacity-35 pointer-events-none border border-dashed border-purple-400/30 rounded px-1"
+          >
+            <GhostContent type={element.type} props={resolved} />
+          </div>
+        )
+      })}
+      {array.length > 2 && (
+        <p className="text-[10px] text-purple-400/50 italic pl-1">
+          +{array.length - 2} more item{array.length - 2 > 1 ? "s" : ""}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Simplified content renderer for ghost rows */
+function GhostContent({ type, props }: { type: string; props: Record<string, unknown> }) {
+  switch (type) {
+    case "Text":
+      return (
+        <p style={{
+          margin: 0,
+          fontSize: props.fontSize ? Number(props.fontSize) : undefined,
+          color: props.color ? String(props.color) : undefined,
+          whiteSpace: "pre-wrap",
+        }}>
+          {typeof props.text === "string" ? props.text : "…"}
+        </p>
+      )
+    case "Heading": {
+      const level = String(props.level || "h2")
+      const sizes: Record<string, number> = { h1: 32, h2: 24, h3: 20, h4: 16 }
+      return (
+        <p style={{
+          margin: 0,
+          fontSize: sizes[level] ?? 24,
+          fontWeight: 700,
+          color: props.color ? String(props.color) : undefined,
+        }}>
+          {typeof props.text === "string" ? props.text : "…"}
+        </p>
+      )
+    }
+    case "Row":
+    case "View":
+      return (
+        <div className="text-[10px] text-muted-foreground py-0.5">
+          {type} (repeated)
+        </div>
+      )
+    default:
+      return (
+        <div className="text-[10px] text-muted-foreground py-0.5">
+          {type}
+        </div>
+      )
+  }
 }
 
 function SortableContainer({
