@@ -6,7 +6,7 @@ import { polar, checkout, portal, usage, webhooks } from "@polar-sh/better-auth"
 import { Polar } from "@polar-sh/sdk"
 import { db } from "@workspace/db/client"
 import { eq } from "drizzle-orm"
-import { subscription } from "@workspace/db/schema"
+import { subscription, member } from "@workspace/db/schema"
 import { sendEmail } from "./emails/send"
 import { VerifyEmail } from "./emails/verify-email"
 import { ResetPassword } from "./emails/reset-password"
@@ -123,7 +123,19 @@ export const auth = betterAuth({
               webhooks({
                 secret: process.env.POLAR_WEBHOOK_SECRET ?? "",
                 onSubscriptionActive: async ({ data }) => {
-                  const orgId = (data as any).metadata?.organizationId as string | undefined
+                  // Try metadata first, then resolve from customer's userId
+                  let orgId = (data as any).metadata?.organizationId as string | undefined
+                  if (!orgId) {
+                    const userId = (data as any).customer?.externalId as string | undefined
+                    if (userId) {
+                      const [membership] = await db
+                        .select({ orgId: member.organizationId })
+                        .from(member)
+                        .where(eq(member.userId, userId))
+                        .limit(1)
+                      orgId = membership?.orgId
+                    }
+                  }
                   if (!orgId) return
 
                   const productId = (data as any).productId as string

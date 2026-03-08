@@ -11,7 +11,7 @@ import {
   SparklesIcon,
 } from "@hugeicons/core-free-icons"
 import { trpc } from "@/lib/trpc"
-import { authClient } from "@workspace/auth/client"
+import { authClient, useActiveOrganization } from "@workspace/auth/client"
 
 const PLANS = [
   {
@@ -85,6 +85,7 @@ function UsageSkeleton() {
 
 export function BillingTab() {
   const { data, isLoading } = trpc.billing.getUsage.useQuery()
+  const { data: activeOrg } = useActiveOrganization()
 
   const currentPlan = data?.plan ?? "free"
   const usage = data?.usage
@@ -92,7 +93,10 @@ export function BillingTab() {
 
   const handleCheckout = async (slug: string) => {
     try {
-      await authClient.checkout({ slug })
+      await authClient.checkout({
+        slug,
+        metadata: activeOrg?.id ? { organizationId: activeOrg.id } : undefined,
+      })
     } catch (err) {
       console.error("Checkout failed:", err)
     }
