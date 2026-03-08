@@ -3,6 +3,9 @@ import { gateway } from "@ai-sdk/gateway"
 import { auth } from "@workspace/auth"
 import { headers } from "next/headers"
 import { variationsResultSchema } from "@/lib/variations-schema"
+import { db } from "@workspace/db"
+import { checkAiCredits, trackAiUsage } from "@workspace/api/lib/polar"
+import { getOrgPlan } from "@workspace/api/lib/quota"
 
 const VARIATION_MODEL = "anthropic/claude-sonnet-4"
 
@@ -53,6 +56,24 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 })
   }
 
+  // Check AI quota
+  const orgId = session.session.activeOrganizationId
+  if (orgId) {
+    const plan = await getOrgPlan(db, orgId)
+    if (plan !== "enterprise") {
+      const credits = await checkAiCredits(session.user.id)
+      if (!credits.allowed) {
+        const message = plan === "free"
+          ? "AI trial credits exhausted (10/month). Upgrade to Pro for 500/month."
+          : "AI credits exhausted. Buy a credit pack or wait for next billing cycle."
+        return new Response(JSON.stringify({ error: message }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        })
+      }
+    }
+  }
+
   const body = await req.json()
   const { element, scope, templateName, siblingTypes, customPrompt } = body as {
     element: { type: string; props: Record<string, unknown> }
@@ -76,6 +97,16 @@ export async function POST(req: Request) {
     model: gateway(VARIATION_MODEL),
     schema: variationsResultSchema,
     prompt,
+    onFinish: ({ usage: aiUsage }) => {
+      if (orgId) {
+        trackAiUsage({
+          userId: session.user.id,
+          organizationId: orgId,
+          type: "remix",
+          totalTokens: aiUsage?.totalTokens,
+        })
+      }
+    },
   })
 
   return result.toTextStreamResponse()

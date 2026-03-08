@@ -26,6 +26,7 @@ import {
 import type { Template } from "@workspace/template-engine/schema"
 import { Suggestions, Suggestion } from "@/components/ai/suggestion"
 import { DOCUMENT_SUGGESTIONS, EDIT_SUGGESTIONS } from "@/components/ai/suggestions-config"
+import { trpc } from "@/lib/trpc"
 
 // --- Trigger Button ---
 
@@ -122,9 +123,12 @@ export function AiAssistantPanel({
         <SheetContent side="bottom" className="flex h-[85vh] flex-col p-0">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <h3 className="text-sm font-semibold">AI Assistant</h3>
-            <Button variant="ghost" size="icon-sm" onClick={onClose}>
-              <HugeiconsIcon icon={Cancel01Icon} size={16} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <AiCreditsBadge />
+              <Button variant="ghost" size="icon-sm" onClick={onClose}>
+                <HugeiconsIcon icon={Cancel01Icon} size={16} />
+              </Button>
+            </div>
           </div>
           <div className="flex min-h-0 flex-1 flex-col">{chatContent}</div>
         </SheetContent>
@@ -157,9 +161,12 @@ export function AiAssistantPanel({
           >
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h3 className="text-sm font-semibold">AI Assistant</h3>
-              <Button variant="ghost" size="icon-sm" onClick={onClose}>
-                <HugeiconsIcon icon={Cancel01Icon} size={16} />
-              </Button>
+              <div className="flex items-center gap-2">
+                <AiCreditsBadge />
+                <Button variant="ghost" size="icon-sm" onClick={onClose}>
+                  <HugeiconsIcon icon={Cancel01Icon} size={16} />
+                </Button>
+              </div>
             </div>
             <div className="flex min-h-0 flex-1 flex-col">{chatContent}</div>
           </motion.div>
@@ -167,6 +174,36 @@ export function AiAssistantPanel({
       )}
     </AnimatePresence>,
     document.body,
+  )
+}
+
+// --- AI Credits Badge ---
+
+function AiCreditsBadge() {
+  const { data } = trpc.billing.getUsage.useQuery(undefined, {
+    staleTime: 30_000,
+  })
+
+  if (!data?.limits?.aiCredits) return null
+
+  const used = data.usage.ai.consumed
+  const total = data.limits.aiCredits
+  const remaining = Math.max(0, total - used)
+  const isWarning = remaining <= Math.ceil(total * 0.1)
+  const isExhausted = remaining === 0
+
+  return (
+    <span
+      className={`text-[10px] font-medium tabular-nums ${
+        isExhausted
+          ? "text-destructive"
+          : isWarning
+            ? "text-yellow-500"
+            : "text-muted-foreground"
+      }`}
+    >
+      {isExhausted ? "⚠️" : ""} {used}/{total}
+    </span>
   )
 }
 
@@ -188,6 +225,10 @@ function AiAssistantChat({
   const appliedToolCallsRef = useRef<Set<string>>(new Set())
   const templateRef = useRef(template)
   templateRef.current = template
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
+  const dispatchRef = useRef(dispatch)
+  dispatchRef.current = dispatch
 
   // Stable transport with template snapshot — only recreated on templateId change
   const transport = useMemo(
@@ -231,7 +272,7 @@ function AiAssistantChat({
             appliedToolCallsRef.current.add(toolPart.toolCallId)
             const result = toolPart.output as Record<string, unknown>
             if (result.action === "saveTemplate") {
-              onSave()
+              onSaveRef.current()
             }
           }
         }
@@ -239,9 +280,9 @@ function AiAssistantChat({
     }
 
     if (latestTemplate) {
-      dispatch({ type: "AI_UPDATE_TEMPLATE", template: latestTemplate })
+      dispatchRef.current({ type: "AI_UPDATE_TEMPLATE", template: latestTemplate })
     }
-  }, [messages, dispatch, onSave])
+  }, [messages])
 
   // Auto-scroll on new messages
   useEffect(() => {

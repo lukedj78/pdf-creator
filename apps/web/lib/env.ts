@@ -32,6 +32,16 @@ export const env = createEnv({
       .string()
       .transform((v) => v === "true")
       .default("false"),
+
+    // Polar (billing)
+    POLAR_ACCESS_TOKEN: z.string().optional(),
+    POLAR_WEBHOOK_SECRET: z.string().optional(),
+    POLAR_AI_METER_ID: z.string().optional(),
+    POLAR_PRO_PRODUCT_ID: z.string().optional(),
+    POLAR_ENTERPRISE_PRODUCT_ID: z.string().optional(),
+    POLAR_CREDITS_100_PRODUCT_ID: z.string().optional(),
+    POLAR_CREDITS_500_PRODUCT_ID: z.string().optional(),
+    POLAR_CREDITS_1000_PRODUCT_ID: z.string().optional(),
   },
 
   client: {
@@ -52,6 +62,14 @@ export const env = createEnv({
     UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
     UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
     SKIP_RATE_LIMIT: process.env.SKIP_RATE_LIMIT,
+    POLAR_ACCESS_TOKEN: process.env.POLAR_ACCESS_TOKEN,
+    POLAR_WEBHOOK_SECRET: process.env.POLAR_WEBHOOK_SECRET,
+    POLAR_AI_METER_ID: process.env.POLAR_AI_METER_ID,
+    POLAR_PRO_PRODUCT_ID: process.env.POLAR_PRO_PRODUCT_ID,
+    POLAR_ENTERPRISE_PRODUCT_ID: process.env.POLAR_ENTERPRISE_PRODUCT_ID,
+    POLAR_CREDITS_100_PRODUCT_ID: process.env.POLAR_CREDITS_100_PRODUCT_ID,
+    POLAR_CREDITS_500_PRODUCT_ID: process.env.POLAR_CREDITS_500_PRODUCT_ID,
+    POLAR_CREDITS_1000_PRODUCT_ID: process.env.POLAR_CREDITS_1000_PRODUCT_ID,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   },
 

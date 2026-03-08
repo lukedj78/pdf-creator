@@ -1,6 +1,7 @@
 import { createAuthClient } from "better-auth/react"
 import { organizationClient, twoFactorClient, adminClient } from "better-auth/client/plugins"
 import { apiKeyClient } from "@better-auth/api-key/client"
+import { polarClient } from "@polar-sh/better-auth/client"
 import { ac, platformRoles, orgRoles } from "./permissions"
 
 export const authClient = createAuthClient({
@@ -16,6 +17,7 @@ export const authClient = createAuthClient({
       roles: platformRoles,
     }),
     apiKeyClient(),
+    polarClient(),
   ],
 })
 

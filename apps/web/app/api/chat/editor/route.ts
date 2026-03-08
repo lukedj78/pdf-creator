@@ -10,6 +10,9 @@ import { gateway } from "@ai-sdk/gateway"
 import { z } from "zod"
 import { auth } from "@workspace/auth"
 import { headers } from "next/headers"
+import { db as database } from "@workspace/db"
+import { checkAiCredits, trackAiUsage } from "@workspace/api/lib/polar"
+import { getOrgPlan } from "@workspace/api/lib/quota"
 import {
   createEmptyTemplate,
   addElement as addElementToTemplate,
@@ -39,6 +42,29 @@ Flat element map with Document > Page as root:
 - **Page**: a page (props: size, orientation, marginTop/Right/Bottom/Left, backgroundColor)
 - Content elements are children of Page.
 
+**IMPORTANT — Structured Grouping**: Always organize elements into logical groups using **View**, **Row**, and **Column** containers. This is critical for both layout control and the tree view hierarchy:
+- Wrap related content in a **View** (e.g., "header-section", "bill-to-section", "totals-section"). This makes the document tree navigable and maintainable.
+- Use **Row** to place elements side by side (e.g., logo + company info, label + value pairs, two-column layouts).
+- Use **Column** inside Row to create multi-column sections with flexible widths (use the \`flex\` prop).
+- **Never** place all elements as flat children of Page. Group them semantically: a header group, a content group, a footer group, etc.
+- Give elements meaningful IDs that reflect their purpose (e.g., "header", "company-info", "invoice-details", "items-table", "totals-section", "footer-note").
+
+Example structure:
+\`\`\`
+Page
+├── header (Row) — logo + title side by side
+│   ├── company-info (View)
+│   └── invoice-info (View)
+├── divider-1
+├── bill-to-section (View)
+├── items-table (Table)
+├── totals-section (View)
+│   ├── subtotal-row (Row)
+│   ├── tax-row (Row)
+│   └── total-row (Row)
+└── footer-note
+\`\`\`
+
 ## Element Types (PascalCase)
 - **Text**: (props: text, fontSize, color, align, fontWeight "normal"|"bold", fontStyle "normal"|"italic", lineHeight)
 - **Heading**: (props: text, level "h1"|"h2"|"h3"|"h4", color, align)
@@ -46,9 +72,9 @@ Flat element map with Document > Page as root:
 - **Link**: (props: text, href, fontSize, color)
 - **Table**: (props: columns [{header, width?, align?}], rows [string[]], headerBackgroundColor, headerTextColor, borderColor, fontSize, striped)
 - **List**: (props: items [string], ordered, fontSize, color, spacing)
-- **View**: container (props: padding, backgroundColor, borderWidth, borderColor, borderRadius, flex, alignItems, justifyContent)
-- **Row**: horizontal flex (props: gap, alignItems, justifyContent, padding, wrap)
-- **Column**: flex column within Row (props: gap, flex, padding, alignItems, justifyContent)
+- **View**: semantic container — use to group related elements (props: padding, backgroundColor, borderWidth, borderColor, borderRadius, flex, alignItems, justifyContent)
+- **Row**: horizontal flex — use for side-by-side layouts (props: gap, alignItems, justifyContent, padding, wrap)
+- **Column**: flex column within Row — use flex prop for proportional widths (props: gap, flex, padding, alignItems, justifyContent)
 - **Spacer**: vertical spacing (props: height)
 - **Divider**: horizontal line (props: color, thickness, marginTop, marginBottom)
 - **PageNumber**: (props: format, fontSize, color, align)
@@ -78,6 +104,24 @@ export async function POST(req: Request) {
 
   if (!session) {
     return new Response("Unauthorized", { status: 401 })
+  }
+
+  // Check AI quota
+  const orgId = session.session.activeOrganizationId
+  if (orgId) {
+    const plan = await getOrgPlan(database, orgId)
+    if (plan !== "enterprise") {
+      const credits = await checkAiCredits(session.user.id)
+      if (!credits.allowed) {
+        const message = plan === "free"
+          ? "AI trial credits exhausted (10/month). Upgrade to Pro for 500/month."
+          : "AI credits exhausted. Buy a credit pack or wait for next billing cycle."
+        return new Response(JSON.stringify({ error: message }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        })
+      }
+    }
   }
 
   const body = await req.json()
@@ -280,6 +324,17 @@ export async function POST(req: Request) {
               templateId: templateId ?? null,
             }),
           }),
+        },
+        onFinish: ({ usage: aiUsage }) => {
+          // Track AI usage in Polar
+          if (orgId) {
+            trackAiUsage({
+              userId: session.user.id,
+              organizationId: orgId,
+              type: "editor",
+              totalTokens: aiUsage?.totalTokens,
+            })
+          }
         },
         onStepFinish: ({ finishReason, toolCalls }) => {
           console.log("[editor-chat] step:", { finishReason, tools: toolCalls?.length ?? 0, elements: Object.keys(currentTemplate.elements).length })

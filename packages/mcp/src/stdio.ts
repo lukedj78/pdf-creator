@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
-import { createMcpServer } from "./server.js"
+import { createMcpServer } from "./server"
 
 const apiKey = process.env.PDFCREATOR_API_KEY
 const baseUrl = process.env.PDFCREATOR_URL ?? "https://specdesigner.com/api/v1"

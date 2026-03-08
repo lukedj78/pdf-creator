@@ -6,6 +6,7 @@ import { webhooksRouter } from "./routers/webhooks"
 import { organizationRouter } from "./routers/organization"
 import { userPreferencesRouter } from "./routers/user-preferences"
 import { activityLogRouter } from "./routers/activity-log"
+import { billingRouter } from "./routers/billing"
 
 export const appRouter = router({
   templates: templatesRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   organization: organizationRouter,
   userPreferences: userPreferencesRouter,
   activityLog: activityLogRouter,
+  billing: billingRouter,
 })
 
 export type AppRouter = typeof appRouter

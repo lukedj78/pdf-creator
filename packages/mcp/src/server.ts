@@ -11,7 +11,7 @@ import {
 } from "@workspace/template-engine/utils"
 import { templateSchema, toSpec } from "@workspace/template-engine/schema"
 import type { ElementType } from "@workspace/template-engine/schema"
-import { ApiClient } from "./api-client.js"
+import { ApiClient } from "./api-client"
 
 // ---------------------------------------------------------------------------
 // Helper: load template from API and parse with Zod

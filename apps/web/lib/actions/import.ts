@@ -6,6 +6,9 @@ import { auth } from "@workspace/auth"
 import { headers } from "next/headers"
 import { importResultSchema, buildTemplate } from "@/lib/import/build-template"
 import type { Template } from "@workspace/template-engine/schema"
+import { db } from "@workspace/db"
+import { checkAiCredits, trackAiUsage } from "@workspace/api/lib/polar"
+import { getOrgPlan } from "@workspace/api/lib/quota"
 
 const IMPORT_MODEL = "anthropic/claude-sonnet-4"
 
@@ -67,7 +70,25 @@ type ImportResponse =
  */
 async function analyzeDocument(
   file: { type: "data"; data: string; mediaType: string } | { type: "url"; url: string },
+  session: { user: { id: string }; session: { activeOrganizationId?: string | null } },
 ): Promise<ImportResponse> {
+  // Check AI quota
+  const orgId = session.session.activeOrganizationId
+  if (orgId) {
+    const plan = await getOrgPlan(db, orgId)
+    if (plan !== "enterprise") {
+      const credits = await checkAiCredits(session.user.id)
+      if (!credits.allowed) {
+        return {
+          success: false,
+          error: plan === "free"
+            ? "AI trial credits exhausted (10/month). Upgrade to Pro for 500/month."
+            : "AI credits exhausted. Buy a credit pack or wait for next billing cycle.",
+        }
+      }
+    }
+  }
+
   try {
     const filePart = file.type === "url"
       ? { type: "file" as const, data: new URL(file.url), mediaType: inferMediaType(file.url) }
@@ -88,6 +109,16 @@ async function analyzeDocument(
     })
 
     const template = buildTemplate(object)
+
+    // Track AI usage
+    if (orgId) {
+      trackAiUsage({
+        userId: session.user.id,
+        organizationId: orgId,
+        type: "import",
+      })
+    }
+
     return { success: true, template }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Import failed"
@@ -109,7 +140,7 @@ export async function importFromUrl(input: {
     return { success: false, error: "Unauthorized" }
   }
 
-  return analyzeDocument({ type: "url", url: input.url })
+  return analyzeDocument({ type: "url", url: input.url }, session)
 }
 
 /**
@@ -127,5 +158,5 @@ export async function importFromFile(input: {
     return { success: false, error: "Unauthorized" }
   }
 
-  return analyzeDocument({ type: "data", data: input.fileBase64, mediaType: input.mimeType })
+  return analyzeDocument({ type: "data", data: input.fileBase64, mediaType: input.mimeType }, session)
 }
