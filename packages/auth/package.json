@@ -1,0 +1,28 @@
+{
+  "name": "@workspace/auth",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./permissions": "./src/permissions.ts",
+    "./emails": "./src/emails/send.ts"
+  },
+  "dependencies": {
+    "@better-auth/api-key": "^1.5.4",
+    "@react-email/components": "^1.0.8",
+    "@workspace/db": "workspace:*",
+    "better-auth": "^1.2.0",
+    "react": "^19.2.4",
+    "resend": "^6.9.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.10",
+    "@workspace/typescript-config": "workspace:*",
+    "typescript": "^5.9.3"
+  }
+}
