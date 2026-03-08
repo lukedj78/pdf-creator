@@ -67,18 +67,51 @@ const CREDIT_PACKS = [
   { slug: "ai-credits-1000", credits: 1000, price: "$35", perCredit: "$0.035" },
 ]
 
-function UsageSkeleton() {
+function BillingSkeleton() {
   return (
-    <div className="space-y-3 pt-2 border-t border-border">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-3 w-24" />
-            <Skeleton className="h-3 w-16" />
+    <div className="max-w-3xl space-y-8">
+      {/* Current Plan skeleton */}
+      <div>
+        <Skeleton className="h-4 w-24 mb-4" />
+        <div className="dash-card p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-6 w-20" />
+            <Skeleton className="h-5 w-14 rounded-full" />
           </div>
-          <Skeleton className="h-1.5 w-full" />
+          <div className="space-y-3 pt-2 border-t border-border">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+                <Skeleton className="h-1.5 w-full" />
+              </div>
+            ))}
+          </div>
         </div>
-      ))}
+      </div>
+
+      {/* Plans skeleton */}
+      <div>
+        <Skeleton className="h-4 w-28 mb-4" />
+        <div className="grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="dash-card p-4 space-y-3">
+              <div>
+                <Skeleton className="h-4 w-16 mb-2" />
+                <Skeleton className="h-6 w-20" />
+              </div>
+              <div className="space-y-1.5">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <Skeleton key={j} className="h-3 w-full" />
+                ))}
+              </div>
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -114,6 +147,10 @@ export function BillingTab() {
   const aiTotal = limits?.aiCredits ?? 0
   const aiExhausted = aiTotal !== null && aiUsed >= aiTotal
 
+  if (isLoading) {
+    return <BillingSkeleton />
+  }
+
   return (
     <div className="max-w-3xl space-y-8">
       {/* Current Plan */}
@@ -148,10 +185,7 @@ export function BillingTab() {
           </div>
 
           {/* Usage */}
-          {isLoading ? (
-            <UsageSkeleton />
-          ) : (
-            <div className="space-y-3 pt-2 border-t border-border">
+          <div className="space-y-3 pt-2 border-t border-border">
               <UsageBar
                 label="AI generations"
                 used={aiUsed}
@@ -173,7 +207,7 @@ export function BillingTab() {
                 total={limits?.members ?? null}
               />
             </div>
-          )}
+          </div>
         </div>
       </div>
 
